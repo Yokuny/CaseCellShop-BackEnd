@@ -1,0 +1,512 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CaseCellShop API",
+    "version": "1.0.0",
+    "description": "Catálogo com cache (Redis), checkout assíncrono (Kafka) e consulta de status de pedidos (MySQL)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Dev"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Products",
+      "description": "Vitrine / catálogo"
+    },
+    {
+      "name": "Checkout",
+      "description": "Início do checkout assíncrono"
+    },
+    {
+      "name": "Orders",
+      "description": "Status dos pedidos"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "case-iphone-15"
+          },
+          "name": {
+            "type": "string",
+            "example": "Capa Silicone iPhone 15"
+          },
+          "description": {
+            "type": "string",
+            "example": "Capa de silicone com toque aveludado"
+          },
+          "price": {
+            "type": "number",
+            "example": 79.9
+          },
+          "stock": {
+            "type": "integer",
+            "example": 120
+          },
+          "category": {
+            "type": "string",
+            "example": "capa"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-10T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "price",
+          "stock",
+          "category",
+          "updatedAt"
+        ]
+      },
+      "ProductsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "message": {
+            "type": "string",
+            "example": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "Produto 'case-x' não encontrado"
+          },
+          "correlationId": {
+            "type": "string",
+            "example": "9f1c0b3e-2a3d-4f5a-9b1c-0b3e2a3d4f5a"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "type": "string",
+                "example": "9f1c0b3e-2a3d-4f5a-9b1c-0b3e2a3d4f5a"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "processing",
+                  "confirmed",
+                  "failed"
+                ],
+                "example": "pending"
+              }
+            },
+            "required": [
+              "orderId",
+              "status"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "Checkout aceito e em processamento"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "CheckoutItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "case-iphone-15"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "example": 2
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ]
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItem"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "case-iphone-15"
+          },
+          "name": {
+            "type": "string",
+            "example": "Capa Silicone iPhone 15"
+          },
+          "price": {
+            "type": "number",
+            "example": 79.9
+          },
+          "quantity": {
+            "type": "integer",
+            "example": 2
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "price",
+          "quantity"
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "9f1c0b3e-2a3d-4f5a-9b1c-0b3e2a3d4f5a"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "confirmed",
+              "failed"
+            ],
+            "example": "confirmed"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 159.8
+          },
+          "attempts": {
+            "type": "integer",
+            "example": 1
+          },
+          "errorReason": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-10T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-10T12:00:02.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "items",
+          "total",
+          "attempts",
+          "errorReason",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "OrderStatusResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "message": {
+            "type": "string",
+            "example": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/products": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Lista o catálogo de produtos (servido via cache com TTL)",
+        "responses": {
+          "200": {
+            "description": "Catálogo de produtos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Detalhe de um produto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Produto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Product"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Produto não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkout": {
+      "post": {
+        "tags": [
+          "Checkout"
+        ],
+        "summary": "Inicia um checkout assíncrono",
+        "description": "Reserva estoque atomicamente, persiste o pedido e publica em Kafka. Aceita o header `Idempotency-Key` para tolerar retry/duplo clique.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Checkout aceito; processamento assíncrono",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Produto não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estoque insuficiente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/status": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Consulta o status de um pedido",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "orderId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status do pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pedido não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

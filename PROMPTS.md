@@ -13,3 +13,25 @@ Registro do uso de IA (Claude) na construção da mini-tarefa, conforme pedido n
 Com base nesse mapeamento, crie uma skill expert que documente esses padrões e convenções para servir de guia na criação de novos módulos do sistema.
 
 Voce é expert na criação de skill e sabe que para criar bons skill e que não consuma muitos tokens faça-o em menos de 200 linhas e se necessario com arquivos load-on-demand para referenciar informações completas
+
+# openapi-setup
+
+Configure a documentação automatizada do OpenAPI (Swagger) deste projeto NodeJS e Express, utilizando o Zod como a fonte única da verdade para os contratos. Torne o processo automatizada sem necessidade de escrever JSON ou YAML na mão.
+
+Por favor, gere a estrutura de arquivos e o código necessário seguindo exatamente as diretrizes abaixo:
+
+1. DEPENDÊNCIAS DO PROJETO:
+Considere o uso das seguintes bibliotecas:
+- `zod` (para validação)
+- `@asteasolutions/zod-to-openapi` (para estender o zod e gerar o registro)
+- `swagger-ui-express` (para expor a interface gráfica)
+
+2. REGRAS DE ARQUITETURA (OBRIGATÓRIO):
+- Instanciação do Zod: Crie um arquivo centralizado (ex: `src/schemas/zod.ts`) que execute `extendZodWithOpenApi(z)` e reexporte o `z`. Todos os outros arquivos do projeto devem importar o 'z' deste arquivo customizado, e NUNCA direto do pacote 'zod'
+- Schemas e DTOs devem ficar isolados em (ex: `src/schemas/`).
+- Helper de Erro: Crie um helper (ex: `jsonError`) para padronizar e reutilizar o schema de respostas de erro (ex: 400, 404, 500) sem repetir código em cada endpoint.
+
+3. Crie:
+- `schemas/zod.ts`: Setup inicial estendendo o Zod.
+- `schemas/error.schema.ts`: Schema padrão do envelope de erro da API.
+- Crie os middlewares do Express para expor o JSON em `/openapi.json` e a UI em `/docs`.
