@@ -35,3 +35,13 @@ Considere o uso das seguintes bibliotecas:
 - `schemas/zod.ts`: Setup inicial estendendo o Zod.
 - `schemas/error.schema.ts`: Schema padrão do envelope de erro da API.
 - Crie os middlewares do Express para expor o JSON em `/openapi.json` e a UI em `/docs`.
+
+# Crie os módulos de `checkout` e `orders`
+
+Use a skill `new-module` (`./.claude/skills/new-module/SKILL.md`), que é expert na criação de novos módulos neste projeto, para manter a consistência e o padrão da arquitetura em camadas (Route → Controller → Service → Repository), espelhando o módulo `products`.
+
+- Verifique no commit anterior SHA e75f51e2cca83fa5cf51ae00ca1b305dc9e3046d para verificar oque é necessario também para criar o processo automatizado de documentação com a lib de OpenAPI.
+- Para detalhes aprofundados confira o arquivo `Desafio.md`
+
+- Crie `POST /checkout` inicia uma compra e retorna **202 Accepted** com `orderId`/`status` (contrato assíncrono).
+- Crie a rota `GET /orders/{orderId}/status` que permite acompanhar o processamento do pedido.
