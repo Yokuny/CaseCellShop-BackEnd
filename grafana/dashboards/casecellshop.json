@@ -1,0 +1,77 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "schemaVersion": 39,
+  "title": "CaseCellShop - Visão Geral",
+  "tags": ["casecellshop"],
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "10s",
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP req/s por rota",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum by (route) (rate(http_request_duration_seconds_count[1m]))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "id": 2,
+      "title": "Latência HTTP p95 (s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "id": 3,
+      "title": "Cache da vitrine (hit/miss/stale)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [{ "expr": "sum by (result) (rate(cache_operations_total[1m]))", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 4,
+      "title": "Cache hit ratio",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "sum(rate(cache_operations_total{result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_operations_total[5m])), 0.0001)", "legendFormat": "hit ratio" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 5,
+      "title": "Pedidos por status",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [{ "expr": "sum by (status) (rate(checkout_orders_total[1m]))", "legendFormat": "{{status}}" }]
+    },
+    {
+      "id": 6,
+      "title": "Reservas de estoque por resultado",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [{ "expr": "sum by (result) (rate(stock_reservation_total[1m]))", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 7,
+      "title": "Kafka (checkout.requested) por resultado",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [{ "expr": "sum by (result) (rate(kafka_messages_total[1m]))", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 8,
+      "title": "ERP faturamento p95 (s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, result) (rate(erp_billing_duration_seconds_bucket[5m])))", "legendFormat": "{{result}}" }]
+    }
+  ]
+}

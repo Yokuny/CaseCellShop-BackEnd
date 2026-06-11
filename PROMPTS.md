@@ -45,3 +45,12 @@ Use a skill `new-module` (`./.claude/skills/new-module/SKILL.md`), que é expert
 
 - Crie `POST /checkout` inicia uma compra e retorna **202 Accepted** com `orderId`/`status` (contrato assíncrono).
 - Crie a rota `GET /orders/{orderId}/status` que permite acompanhar o processamento do pedido.
+
+# Implemente a observabilidade com Prometheus e Grafana
+
+Como não temos conta real de Datadog, use Prometheus + Grafana como equivalente local para detectar degradação e furos de estoque. Para detalhes confira a Pergunta 3 do `Desafio.md`.
+
+- Use `prom-client` para instrumentar e exponha as métricas em `/metrics` (servidor de métricas próprio, na `METRICS_PORT`).
+- Crie counters/gauges/histograms para os fluxos que importam: cache (hit/miss/stale), checkout/pedidos, estoque/concorrência, fila/worker e ERP simulado.
+- Configure o `prometheus.yml` para fazer scrape do `/metrics` do backend.
+- Provisione o Grafana via arquivos (datasource do Prometheus + dashboard como código em `grafana/`), sem precisar configurar nada na mão pela UI.
