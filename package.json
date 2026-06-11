@@ -1,0 +1,73 @@
+{
+  "name": "casecellshop-backend",
+  "version": "1.0.0",
+  "description": "Serviço backend para a CaseCellShop que expoe catálogo de produtos com cache, inicia um checkout assíncrono e permita consultar o status dos pedidos",
+  "main": "index.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "npx @biomejs/biome check",
+    "format": "npx @biomejs/biome check --write",
+    "build": "tsc",
+    "dev": "tsx watch --env-file .env ./index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "openapi:json": "tsx ./src/openapi/export.ts",
+    "docker:up": "docker compose up -d --build && echo '\\n🚀 Ambiente no ar!\\n🌍 API:        http://localhost:8080\\n📚 Swagger:    http://localhost:8080/docs\\n📟 Métricas:   http://localhost:9100/metrics\\n📈 Prometheus: http://localhost:9090\\n📊 Grafana:    http://localhost:3100\\n🧵 Kafka UI:   http://localhost:8085\\n'",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:clean": "docker compose down -v"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yokuny/CaseCellShop-BackEnd.git"
+  },
+  "keywords": [
+    "express",
+    "ts",
+    "mysql",
+    "kafka",
+    "redis",
+    "prometheus",
+    "grafana",
+    "openapi"
+  ],
+  "author": "Yokuny",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "bugs": {
+    "url": "https://github.com/Yokuny/CaseCellShop-BackEnd/issues"
+  },
+  "homepage": "https://github.com/Yokuny/CaseCellShop-BackEnd#readme",
+  "devDependencies": {
+    "@biomejs/biome": "^2",
+    "@types/cors": "^2",
+    "@types/express": "^5",
+    "@types/node": "^22",
+    "@types/response-time": "^2",
+    "@types/swagger-ui-express": "^4",
+    "supertest": "^7",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^2"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7",
+    "cors": "^2",
+    "express": "^5",
+    "ioredis": "^5",
+    "kafkajs": "^2",
+    "mysql2": "^3",
+    "pino": "^9",
+    "prom-client": "^15",
+    "response-time": "^2",
+    "swagger-ui-express": "^5",
+    "uuid": "^11",
+    "zod": "^3"
+  }
+}
