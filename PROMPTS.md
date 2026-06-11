@@ -54,3 +54,18 @@ Como não temos conta real de Datadog, use Prometheus + Grafana como equivalente
 - Crie counters/gauges/histograms para os fluxos que importam: cache (hit/miss/stale), checkout/pedidos, estoque/concorrência, fila/worker e ERP simulado.
 - Configure o `prometheus.yml` para fazer scrape do `/metrics` do backend.
 - Provisione o Grafana via arquivos (datasource do Prometheus + dashboard como código em `grafana/`), sem precisar configurar nada na mão pela UI.
+
+# Suba o ambiente local todo em Docker
+
+Cria a stack inteira necessaria para o ambiente dev com o mysql, redis, kafka, kafka-ui, prometheus e meu back-end e as vpc necessarias para comunicação. Faça em um docker composer sem depender de ferramentas externas apenas do docker.
+
+**Serviços que devem subir:**
+- `mysql`, `redis 7`, `kafka 3.9` (sem Zookeeper), `kafka-ui`para inspecionar tópicos/mensagens, `prometheus` + `grafana` ( alimentado pela rota de `/metrics` do backe-end e crie uma config base do grafana ), `backend` que já tem build presente no `Dockerfile` multi-stage (builder + production).
+
+**"VPC" do compose:**
+- Não use `localhost` entre containers. Crie UMA rede bridge própria (ex.: `casecellshop-network`) e coloque todos os serviços nela.
+- `mysql:3306`, `redis:6379`, `kafka:9092`
+- O Kafka precisa de listeners separados: um interno e um para acesso no terminal `localhost:29092` 
+
+**Persistencia de dados:**
+- Os dados precisam sobreviver mesmo que eu apague containers e imagens (`docker compose down`, rebuild); `mysql_data`, `redis_data`, `kafka_data`, `prometheus_data`, `grafana_data`. só devem sumir se eu explicitamente remover os volumes (`down -v`).

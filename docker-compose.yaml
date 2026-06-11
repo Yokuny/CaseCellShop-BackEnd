@@ -1,0 +1,182 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: casecellshop-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-casecellshop}
+      MYSQL_USER: ${MYSQL_USER:-casecellshop}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-casecellshop}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - casecellshop-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: casecellshop-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - casecellshop-network
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: casecellshop-kafka
+    restart: unless-stopped
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Host vazio (://:porta) faz o bind em todas as interfaces; advertised usa
+      # nomes roteáveis. PLAINTEXT = rede interna (kafka:9092); PLAINTEXT_HOST =
+      # acesso do host (localhost:29092).
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092,PLAINTEXT_HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - casecellshop-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: casecellshop-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: casecellshop
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - casecellshop-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: casecellshop-back
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+      - "${METRICS_PORT:-9100}:${METRICS_PORT:-9100}"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: pnpm dev
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=${PORT:-8080}
+      - METRICS_PORT=${METRICS_PORT:-9100}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-casecellshop}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-casecellshop}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-casecellshop}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BROKERS=kafka:9092
+      - PRODUCT_CACHE_TTL=${PRODUCT_CACHE_TTL:-30}
+      - PRODUCT_CACHE_STALE_TTL=${PRODUCT_CACHE_STALE_TTL:-300}
+      - CHECKOUT_MAX_ATTEMPTS=${CHECKOUT_MAX_ATTEMPTS:-3}
+      - ERP_FAILURE_RATE=${ERP_FAILURE_RATE:-0}
+    networks:
+      - casecellshop-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: casecellshop-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - casecellshop-network
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: casecellshop-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3100}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - casecellshop-network
+    depends_on:
+      - prometheus
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  casecellshop-network:
+    driver: bridge
