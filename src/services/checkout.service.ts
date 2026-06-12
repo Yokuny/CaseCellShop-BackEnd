@@ -8,14 +8,6 @@ import type { Checkout } from "../models";
 import * as orderRepository from "../repositories/order.repository";
 import * as productRepository from "../repositories/product.repository";
 
-/**
- * POST /checkout — fluxo assíncrono:
- *  1. Idempotência: se a idempotencyKey já tem pedido, devolve-o (sem efeitos colaterais).
- *  2. Reserva de estoque atômica no MySQL (anti-overselling).
- *  3. Persiste o pedido (pending) ANTES de publicar — evita "mensagem fantasma".
- *  4. Publica em checkout.requested para o worker faturar no ERP.
- * Retorna 202 com orderId/status; o status final é consultado em /orders/:id/status.
- */
 export const createCheckout = async (data: Checkout, idempotencyKey: string): Promise<ServiceRes> => {
   // 1. Idempotência (duplo clique / retry) — chave única no banco é o árbitro final.
   const existing = await orderRepository.findByIdempotencyKey(idempotencyKey);

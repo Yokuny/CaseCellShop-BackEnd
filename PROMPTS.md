@@ -69,3 +69,15 @@ Cria a stack inteira necessaria para o ambiente dev com o mysql, redis, kafka, k
 
 **Persistencia de dados:**
 - Os dados precisam sobreviver mesmo que eu apague containers e imagens (`docker compose down`, rebuild); `mysql_data`, `redis_data`, `kafka_data`, `prometheus_data`, `grafana_data`. só devem sumir se eu explicitamente remover os volumes (`down -v`).
+
+# Implemente o Kafka: producer e consumer do checkout
+
+Implemente o processo de (`kafkajs`). Mantenha o Kafka isolado em `messaging/` (producer) e `workers/` (consumer), e as config em `config/kafka.config.ts`.
+
+- O nome do tópico deve ser (`checkout.requested`). E deve ser usado no processo de `services/checkout.service.ts`
+- Publique o evento `checkout.requested` com `key = orderId` (ordem por pedido). Que deve ser publicado **apenas depois de gravar o pedido no banco**.
+
+**Consumer / worker (`workers/`):**
+- Consome `checkout.requested` e simula o faturamento no ERP (`erp.service`).
+- **Idempotência de processamento:** se o pedido já está `confirmed`, ignora a reentrega (não refatura).
+- **Retry:** o Kafka deve reentregar; e ao atingir o limite de tentativa marca o pedido como `failed`. Isso deve fazer com que o estoque ganhe de volta o valor de estoque.
