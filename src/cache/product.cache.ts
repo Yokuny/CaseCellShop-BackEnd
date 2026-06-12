@@ -6,6 +6,7 @@ import type { Product } from "../models";
 const FRESH_KEY = "catalog:fresh";
 const STALE_KEY = "catalog:stale"; // cópia de vida longa para fallback
 const LOCK_KEY = "catalog:lock";
+const GEN_KEY = "catalog:gen"; // contador de geração; incrementado a cada invalidação
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -19,10 +20,37 @@ const readStale = async (): Promise<Product[] | null> => {
   return raw ? (JSON.parse(raw) as Product[]) : null;
 };
 
-const writeCache = async (products: Product[]): Promise<void> => {
+const readGen = async (): Promise<string> => (await redis.get(GEN_KEY)) ?? "0";
+
+// Grava fresh+stale SOMENTE se a geração não mudou desde o início do load.
+// Fecha o race read-then-write: se um checkout invalidou enquanto o líder lia
+// o DB, a geração avançou e descartamos o snapshot obsoleto (em vez de cacheá-lo).
+// Atômico (compare-and-set via Lua) para não haver janela entre o GET e o SET.
+const WRITE_IF_GEN_UNCHANGED = `
+local cur = redis.call('GET', KEYS[3])
+if not cur then cur = '0' end
+if cur == ARGV[4] then
+  redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+  redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[3])
+  return 1
+end
+return 0
+`;
+
+const writeCacheIfFresh = async (products: Product[], genBefore: string): Promise<boolean> => {
   const payload = JSON.stringify(products);
-  await redis.set(FRESH_KEY, payload, "EX", env.PRODUCT_CACHE_TTL);
-  await redis.set(STALE_KEY, payload, "EX", env.PRODUCT_CACHE_STALE_TTL);
+  const wrote = (await redis.eval(
+    WRITE_IF_GEN_UNCHANGED,
+    3,
+    FRESH_KEY,
+    STALE_KEY,
+    GEN_KEY,
+    payload,
+    String(env.PRODUCT_CACHE_TTL),
+    String(env.PRODUCT_CACHE_STALE_TTL),
+    genBefore,
+  )) as number;
+  return wrote === 1;
 };
 
 /**
@@ -40,6 +68,10 @@ export const getCatalogCached = async (loader: () => Promise<Product[]>): Promis
   }
 
   cacheOps.inc({ cache: "catalog", result: "miss" });
+
+  // Captura a geração ANTES de carregar o DB. Se mudar até a hora de gravar,
+  // significa que houve uma invalidação concorrente e o snapshot é obsoleto.
+  const genBefore = await readGen();
 
   // Single-flight: tenta virar o "líder" que repopula o cache.
   const isLeader = (await redis.set(LOCK_KEY, "1", "PX", 5000, "NX")) === "OK";
@@ -64,7 +96,13 @@ export const getCatalogCached = async (loader: () => Promise<Product[]>): Promis
 
   try {
     const products = await loader();
-    await writeCache(products);
+    const cached = await writeCacheIfFresh(products, genBefore);
+    if (!cached) {
+      // Houve invalidação durante o load: não cacheamos dado obsoleto.
+      // O próximo request dá MISS e recarrega o estado já atualizado.
+      cacheOps.inc({ cache: "catalog", result: "stale_write_skipped" });
+      logger.debug("[CACHE] geração mudou durante o load, snapshot descartado");
+    }
     return products;
   } catch (e) {
     const stale = await readStale();
@@ -80,8 +118,10 @@ export const getCatalogCached = async (loader: () => Promise<Product[]>): Promis
   }
 };
 
-// Invalida a cópia fresh (mantém a stale como rede de proteção). Chamado quando
-// o estoque muda no checkout, para a disponibilidade não ficar obsoleta.
+// Invalida a cópia fresh (mantém a stale como rede de proteção) e avança a
+// geração. O INCR é o que neutraliza o race read-then-write: um load que já
+// começou e ainda não gravou verá a geração diferente e descartará seu snapshot.
+// Chamado sempre que o estoque muda (checkout e reconciliação do worker).
 export const invalidateCatalog = async (): Promise<void> => {
-  await redis.del(FRESH_KEY);
+  await redis.multi().del(FRESH_KEY).incr(GEN_KEY).exec();
 };

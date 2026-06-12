@@ -1,4 +1,5 @@
 import type { Consumer } from "kafkajs";
+import { invalidateCatalog } from "../cache";
 import { env, kafka, TOPICS } from "../config";
 import { logger, runWithContext } from "../logger";
 import { checkoutProcessing, kafkaMessages, ordersTotal, stockReservations } from "../metrics";
@@ -42,6 +43,8 @@ const processEvent = async (event: CheckoutRequestedEvent): Promise<void> => {
       // Falha definitiva: marca como failed e reconcilia (devolve o estoque reservado).
       await orderRepository.updateStatus(orderId, "failed", { errorReason: reason });
       await productRepository.releaseStock(order.items);
+      // Estoque voltou ao DB → vitrine cacheada ficou obsoleta, invalida.
+      await invalidateCatalog();
       stockReservations.inc({ result: "released" });
       ordersTotal.inc({ status: "failed" });
       stop({ result: "failed" });
